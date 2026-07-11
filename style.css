@@ -1,7 +1,7 @@
-:root{--ink:#fff;--muted:rgba(255,255,255,.7);--panel:rgba(79,55,135,.26);--accent:#f477c2;--accent2:#8d68e8;--bg1:#b9d9f3;--bg2:#b4a6ed;--bg3:#7155bb}
+:root{--ink:#fff;--muted:rgba(255,255,255,.7);--panel:rgba(79,55,135,.26);--accent:#f477c2;--accent2:#8d68e8;--bg1:#9fd9ef;--bg2:#8cbce5;--bg3:#7766c5}
 *{box-sizing:border-box}
 html,body,#game{width:100%;height:100%;margin:0;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
-body{font-family:Inter,ui-rounded,"SF Pro Display",system-ui,sans-serif;color:var(--ink);background:linear-gradient(160deg,var(--bg1),var(--bg2) 48%,var(--bg3));overscroll-behavior:none}
+body{font-family:Inter,ui-rounded,"SF Pro Display",system-ui,sans-serif;color:var(--ink);background:linear-gradient(160deg,var(--bg1),var(--bg2) 48%,var(--bg3));transition:background 1.2s ease;overscroll-behavior:none}
 #game{position:relative;isolation:isolate}
 #scene,#scene canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .ambient{position:absolute;border-radius:50%;filter:blur(50px);opacity:.2;pointer-events:none;z-index:-1}.ambient-one{width:55vmax;height:55vmax;left:-35vmax;top:-15vmax;background:#fff}.ambient-two{width:40vmax;height:40vmax;right:-25vmax;bottom:-15vmax;background:#ee78cf}
