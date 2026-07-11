@@ -3,7 +3,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.m
 const $=s=>document.querySelector(s);
 const ui={menu:$('#menu'),over:$('#gameOver'),score:$('#score'),scoreWrap:$('#scoreWrap'),menuBest:$('#menuBest'),finalScore:$('#finalScore'),finalBest:$('#finalBest'),perfect:$('#perfect'),hint:$('#hint'),sound:$('#sound')};
 const CFG={size:3.5,height:.72,bound:4.35,gravity:19,maxSize:3.5};
-let scene,camera,renderer,clock,state='menu',blocks=[],falling=[],current=null,axis='x',score=0,combo=0,speed=2.6,cameraY=5.6,targetCameraY=5.6,audio=null,soundOn=true,lastInput=0,paletteSeed=Math.random()*Math.PI*2;
+let scene,camera,renderer,clock,state='menu',blocks=[],falling=[],current=null,axis='x',score=0,combo=0,speed=2.6,cameraY=5.6,targetCameraY=5.6,audio=null,soundOn=true,lastInput=0,paletteSeed=Math.random()*Math.PI*2,earth,stars;
 
 function safeGet(key,fallback){try{const v=localStorage.getItem(key);return v===null?fallback:v}catch{return fallback}}
 function safeSet(key,v){try{localStorage.setItem(key,String(v))}catch{}}
@@ -14,7 +14,15 @@ function initAudio(){if(!audio)audio=new (window.AudioContext||window.webkitAudi
 function tone(freq,duration=.09,type='sine',gain=.035,delay=0){if(!soundOn)return;initAudio();const t=audio.currentTime+delay,o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(gain,t+.012);g.gain.exponentialRampToValueAtTime(.001,t+duration);o.connect(g).connect(audio.destination);o.start(t);o.stop(t+duration+.02)}
 function playSound(kind){if(kind==='place')tone(330,.07,'sine',.028);if(kind==='cut')tone(145,.12,'triangle',.025);if(kind==='perfect'){tone(520,.12,'sine',.035);tone(780,.14,'sine',.025,.055)}if(kind==='over'){tone(260,.25,'triangle',.035);tone(155,.3,'sine',.025,.15)}}
 
-function initScene(){scene=new THREE.Scene();scene.fog=new THREE.Fog(0xa99fe2,10,25);camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,.1,100);camera.position.set(7,5.6,8);renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;$('#scene').appendChild(renderer.domElement);scene.add(new THREE.HemisphereLight(0xddecff,0x65438e,2.1));scene.add(new THREE.AmbientLight(0xffffff,.65));const light=new THREE.DirectionalLight(0xffe5f5,2.3);light.position.set(-5,9,6);scene.add(light);clock=new THREE.Clock();resizeRenderer();animate()}
+function initScene(){scene=new THREE.Scene();scene.fog=new THREE.Fog(0xa5bde5,10,28);camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,.1,120);camera.position.set(7,5.6,8);renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;$('#scene').appendChild(renderer.domElement);scene.add(new THREE.HemisphereLight(0xddecff,0x26305f,2.1));scene.add(new THREE.AmbientLight(0xffffff,.65));const light=new THREE.DirectionalLight(0xffe5f5,2.3);light.position.set(-5,9,6);scene.add(light);createWorldBackdrop();clock=new THREE.Clock();resizeRenderer();animate()}
+function createWorldBackdrop(){
+  const earthMat=new THREE.MeshStandardMaterial({color:0x3c88bd,roughness:.82,metalness:0,emissive:0x102b58,emissiveIntensity:.2});
+  earth=new THREE.Mesh(new THREE.SphereGeometry(8,48,32),earthMat);earth.position.set(0,-8.15,0);scene.add(earth);
+  const count=420,positions=new Float32Array(count*3);
+  for(let i=0;i<count;i++){const radius=18+Math.random()*35,theta=Math.random()*Math.PI*2,phi=Math.acos(2*Math.random()-1);positions[i*3]=radius*Math.sin(phi)*Math.cos(theta);positions[i*3+1]=radius*Math.cos(phi)+12;positions[i*3+2]=radius*Math.sin(phi)*Math.sin(theta)}
+  const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  const material=new THREE.PointsMaterial({color:0xffffff,size:.09,transparent:true,opacity:0,depthWrite:false});stars=new THREE.Points(geometry,material);scene.add(stars);
+}
 function colorFor(i,shift=0){
   // Fazları kaydırılmış RGB kanalları canlı ama pastel bir renk döngüsü üretir.
   const phase=paletteSeed+i*.48+shift;
@@ -40,7 +48,7 @@ function resizeBlockGeometry(block){
   block.mesh.scale.set(1,1,1);
 }
 function createInitialBlock(){blocks.push(createBlock(CFG.size,CFG.size,0,0,0,0))}
-function spawnMovingBlock(){const prev=blocks.at(-1),y=blocks.length*CFG.height;axis=blocks.length%2?'x':'z';const direction=blocks.length%4<2?1:-1;const pos=direction*-CFG.bound;current=createBlock(prev.w,prev.d,axis==='x'?pos:prev.mesh.position.x,y,axis==='z'?pos:prev.mesh.position.z,blocks.length);current.direction=direction}
+function spawnMovingBlock(){const prev=blocks.at(-1),y=blocks.length*CFG.height;axis=blocks.length%2?'x':'z';const fromTop=axis==='x';const pos=fromTop?-CFG.bound:CFG.bound;const direction=fromTop?1:-1;current=createBlock(prev.w,prev.d,axis==='x'?pos:prev.mesh.position.x,y,axis==='z'?pos:prev.mesh.position.z,blocks.length);current.direction=direction}
 function calculateOverlap(){
   const prev=blocks.at(-1),key=axis==='x'?'x':'z',sizeKey=axis==='x'?'w':'d';
   const previousSize=prev[sizeKey],currentSize=current[sizeKey];
@@ -90,8 +98,19 @@ function updateBlockColors(dt){
     current.mesh.material.color.lerp(current.targetColor,1-Math.exp(-3.2*dt));
   }
 }
+function updateEnvironment(dt){
+  const progress=THREE.MathUtils.clamp(score/32,0,1),ease=progress*progress*(3-2*progress);
+  stars.material.opacity=THREE.MathUtils.damp(stars.material.opacity,ease*.9,2.2,dt);
+  stars.rotation.y+=dt*.006;
+  earth.material.emissiveIntensity=.2+ease*.18;
+  const fogTarget=new THREE.Color().lerpColors(new THREE.Color(0xa5bde5),new THREE.Color(0x101531),ease);
+  scene.fog.color.lerp(fogTarget,1-Math.exp(-1.8*dt));
+  document.documentElement.style.setProperty('--bg1',`rgb(${Math.round(159*(1-ease)+10*ease)},${Math.round(217*(1-ease)+16*ease)},${Math.round(239*(1-ease)+43*ease)})`);
+  document.documentElement.style.setProperty('--bg2',`rgb(${Math.round(140*(1-ease)+26*ease)},${Math.round(188*(1-ease)+20*ease)},${Math.round(229*(1-ease)+65*ease)})`);
+  document.documentElement.style.setProperty('--bg3',`rgb(${Math.round(119*(1-ease)+50*ease)},${Math.round(102*(1-ease)+30*ease)},${Math.round(197*(1-ease)+92*ease)})`);
+}
 function updateCamera(dt){cameraY=THREE.MathUtils.damp(cameraY,targetCameraY,state==='gameOver'?1.8:3.2,dt);camera.position.y=cameraY;const lookY=cameraY-3.6;camera.lookAt(0,lookY,0)}
-function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);updateMovingBlock(dt);updateFalling(dt);updateBlockColors(dt);updateCamera(dt);renderer.render(scene,camera)}
+function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);updateMovingBlock(dt);updateFalling(dt);updateBlockColors(dt);updateEnvironment(dt);updateCamera(dt);renderer.render(scene,camera)}
 function resizeRenderer(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight,false);const portrait=innerHeight>innerWidth;camera.position.x=portrait?7.4:8.6;camera.position.z=portrait?8.8:9.4;camera.fov=portrait?39:34;camera.updateProjectionMatrix()}
 function gameInput(e){if(e.target.closest('button'))return;const now=performance.now();if(now-lastInput<180)return;lastInput=now;if(state==='playing')placeCurrentBlock()}
 
