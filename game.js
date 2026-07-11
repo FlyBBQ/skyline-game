@@ -12,7 +12,7 @@ function best(){return Number(safeGet('skylineBest','0'))||0}
 function updateBestUI(){ui.menuBest.textContent=best();ui.finalBest.textContent=best()}
 function initAudio(){if(!audio)audio=new (window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume()}
 function tone(freq,duration=.09,type='sine',gain=.035,delay=0){if(!soundOn)return;initAudio();const t=audio.currentTime+delay,o=audio.createOscillator(),g=audio.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(gain,t+.012);g.gain.exponentialRampToValueAtTime(.001,t+duration);o.connect(g).connect(audio.destination);o.start(t);o.stop(t+duration+.02)}
-function playSound(kind){if(kind==='place')tone(330,.07,'sine',.028);if(kind==='cut')tone(145,.12,'triangle',.025);if(kind==='perfect'){tone(520,.12,'sine',.035);tone(780,.14,'sine',.025,.055)}if(kind==='over'){tone(260,.25,'triangle',.035);tone(155,.3,'sine',.025,.15)}}
+function playSound(kind){if(kind==='place')tone(330,.07,'sine',.028);if(kind==='cut')tone(145,.12,'triangle',.025);if(kind==='perfect'){const level=Math.min(combo,16),base=480+level*20;tone(base,.11,'sine',.032);tone(base*1.5,.14,'sine',.022,.045);if(combo>=7)tone(base*2,.16,'triangle',.014,.085)}if(kind==='over'){tone(260,.25,'triangle',.035);tone(155,.3,'sine',.025,.15)}}
 
 function initScene(){scene=new THREE.Scene();scene.fog=new THREE.Fog(0xa5bde5,10,28);camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,.1,120);camera.position.set(7,5.6,8);renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;$('#scene').appendChild(renderer.domElement);scene.add(new THREE.HemisphereLight(0xddecff,0x26305f,2.1));scene.add(new THREE.AmbientLight(0xffffff,.65));const light=new THREE.DirectionalLight(0xffe5f5,2.3);light.position.set(-5,9,6);scene.add(light);createWorldBackdrop();clock=new THREE.Clock();resizeRenderer();animate()}
 function createWorldBackdrop(){
@@ -47,6 +47,22 @@ function resizeBlockGeometry(block){
   block.mesh.geometry=new THREE.BoxGeometry(block.w,CFG.height,block.d);
   block.mesh.scale.set(1,1,1);
 }
+function speedForScore(value){
+  if(value<=50)return 2.05+value*.012;
+  if(value<=100)return 2.65+(value-50)*.026;
+  return Math.min(7.2,3.95+(value-100)*.045);
+}
+function recoverRandomSide(block){
+  const choices=[];
+  if(block.w<CFG.maxSize-.001)choices.push(['x',-1],['x',1]);
+  if(block.d<CFG.maxSize-.001)choices.push(['z',-1],['z',1]);
+  if(!choices.length)return;
+  const [dimension,side]=choices[Math.floor(Math.random()*choices.length)];
+  const sizeKey=dimension==='x'?'w':'d';
+  const amount=Math.min(.07,CFG.maxSize-block[sizeKey]);
+  block[sizeKey]+=amount;
+  block.mesh.position[dimension]+=side*amount/2;
+}
 function createInitialBlock(){blocks.push(createBlock(CFG.size,CFG.size,0,0,0,0))}
 function spawnMovingBlock(){const prev=blocks.at(-1),y=blocks.length*CFG.height;axis=blocks.length%2?'x':'z';const fromTop=axis==='x';const pos=fromTop?-CFG.bound:CFG.bound;const direction=fromTop?1:-1;current=createBlock(prev.w,prev.d,axis==='x'?pos:prev.mesh.position.x,y,axis==='z'?pos:prev.mesh.position.z,blocks.length);current.direction=direction}
 function calculateOverlap(){
@@ -77,11 +93,11 @@ function createFallingPiece(info){
   piece.mesh.material.transparent=true;piece.mesh.material.opacity=.92;
   piece.life=0;piece.maxLife=1.45;falling.push(piece);
 }
-function placeCurrentBlock(){if(state!=='playing'||!current)return;const info=calculateOverlap();if(info.overlap<=0){current.velocity=new THREE.Vector3(axis==='x'?current.direction*3.2:0,-.7,axis==='z'?current.direction*3.2:0);current.spin=new THREE.Vector3(.7,.4,.8);current.mesh.material.transparent=true;current.mesh.material.opacity=.92;current.life=0;current.maxLife=1.45;falling.push(current);current=null;endGame();return}const tolerance=Math.max(.12,info.size*.06),isPerfect=Math.abs(info.delta)<=tolerance;if(isPerfect){combo++;current.mesh.position.x=info.prev.mesh.position.x;current.mesh.position.z=info.prev.mesh.position.z;current.w=info.prev.w;current.d=info.prev.d;if(combo>=7){const recovery=Math.min(.08,.05+(combo-7)*.005);current.w=Math.min(CFG.maxSize,current.w+recovery);current.d=Math.min(CFG.maxSize,current.d+recovery)}resizeBlockGeometry(current);showPerfectEffect();playSound('perfect')}else{combo=0;createFallingPiece(info);current[info.sizeKey]=info.overlap;current.mesh.position[info.key]=info.overlapCenter;resizeBlockGeometry(current);playSound('cut')}blocks.push(current);current=null;score++;speed=Math.min(6.2,2.6+score*.075);updateScoreUI();targetCameraY=Math.max(5.6,blocks.at(-1).mesh.position.y+3.9);spawnMovingBlock()}
+function placeCurrentBlock(){if(state!=='playing'||!current)return;const info=calculateOverlap();if(info.overlap<=0){current.velocity=new THREE.Vector3(axis==='x'?current.direction*3.2:0,-.7,axis==='z'?current.direction*3.2:0);current.spin=new THREE.Vector3(.7,.4,.8);current.mesh.material.transparent=true;current.mesh.material.opacity=.92;current.life=0;current.maxLife=1.45;falling.push(current);current=null;endGame();return}const tolerance=Math.max(.12,info.size*.06),isPerfect=Math.abs(info.delta)<=tolerance;if(isPerfect){combo++;current.mesh.position.x=info.prev.mesh.position.x;current.mesh.position.z=info.prev.mesh.position.z;current.w=info.prev.w;current.d=info.prev.d;if(combo>=7)recoverRandomSide(current);resizeBlockGeometry(current);showPerfectEffect();playSound('perfect')}else{combo=0;createFallingPiece(info);current[info.sizeKey]=info.overlap;current.mesh.position[info.key]=info.overlapCenter;resizeBlockGeometry(current);playSound('cut')}blocks.push(current);current=null;score++;speed=speedForScore(score);updateScoreUI();targetCameraY=Math.max(5.6,blocks.at(-1).mesh.position.y+3.9);spawnMovingBlock()}
 function showPerfectEffect(){ui.perfect.textContent=combo>1?`PERFECT ×${combo}`:'PERFECT';ui.perfect.classList.remove('show');void ui.perfect.offsetWidth;ui.perfect.classList.add('show');document.body.style.setProperty('--accent',combo>3?'#ffe19c':'#f477c2')}
 function updateScoreUI(){ui.score.textContent=score;ui.scoreWrap.classList.remove('bump');void ui.scoreWrap.offsetWidth;ui.scoreWrap.classList.add('bump')}
 function clearWorld(){[...blocks,...falling,current].filter(Boolean).forEach(disposeBlock);blocks=[];falling=[];current=null}
-function resetGame(){clearWorld();score=0;combo=0;speed=2.6;paletteSeed=Math.random()*Math.PI*2;cameraY=targetCameraY=5.6;camera.position.set(7,cameraY,8);updateScoreUI();createInitialBlock()}
+function resetGame(){clearWorld();score=0;combo=0;speed=speedForScore(0);paletteSeed=Math.random()*Math.PI*2;cameraY=targetCameraY=5.6;camera.position.set(7,cameraY,8);updateScoreUI();createInitialBlock()}
 function startGame(){initAudio();resetGame();state='playing';ui.menu.classList.remove('active');ui.over.classList.remove('active');ui.scoreWrap.classList.remove('hidden');ui.hint.classList.remove('hidden');spawnMovingBlock()}
 function endGame(){state='gameOver';playSound('over');const high=Math.max(best(),score);safeSet('skylineBest',high);ui.finalScore.textContent=score;updateBestUI();ui.hint.classList.add('hidden');setTimeout(()=>ui.over.classList.add('active'),420);targetCameraY+=.35}
 function showMenu(){resetGame();state='menu';ui.over.classList.remove('active');ui.menu.classList.add('active');ui.scoreWrap.classList.add('hidden');ui.hint.classList.add('hidden');updateBestUI()}
