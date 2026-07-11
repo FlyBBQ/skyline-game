@@ -3,7 +3,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.m
 const $=s=>document.querySelector(s);
 const ui={menu:$('#menu'),over:$('#gameOver'),score:$('#score'),scoreWrap:$('#scoreWrap'),menuBest:$('#menuBest'),finalScore:$('#finalScore'),finalBest:$('#finalBest'),perfect:$('#perfect'),hint:$('#hint'),sound:$('#sound')};
 const CFG={size:3.5,height:.72,bound:4.35,gravity:19,maxSize:3.5};
-let scene,camera,renderer,clock,state='menu',blocks=[],falling=[],current=null,axis='x',score=0,combo=0,speed=2.6,cameraY=5.6,targetCameraY=5.6,audio=null,soundOn=true,lastInput=0;
+let scene,camera,renderer,clock,state='menu',blocks=[],falling=[],current=null,axis='x',score=0,combo=0,speed=2.6,cameraY=5.6,targetCameraY=5.6,audio=null,soundOn=true,lastInput=0,paletteSeed=Math.random()*Math.PI*2;
 
 function safeGet(key,fallback){try{const v=localStorage.getItem(key);return v===null?fallback:v}catch{return fallback}}
 function safeSet(key,v){try{localStorage.setItem(key,String(v))}catch{}}
@@ -17,7 +17,7 @@ function playSound(kind){if(kind==='place')tone(330,.07,'sine',.028);if(kind==='
 function initScene(){scene=new THREE.Scene();scene.fog=new THREE.Fog(0xa99fe2,10,25);camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,.1,100);camera.position.set(7,5.6,8);renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;$('#scene').appendChild(renderer.domElement);scene.add(new THREE.HemisphereLight(0xddecff,0x65438e,2.1));scene.add(new THREE.AmbientLight(0xffffff,.65));const light=new THREE.DirectionalLight(0xffe5f5,2.3);light.position.set(-5,9,6);scene.add(light);clock=new THREE.Clock();resizeRenderer();animate()}
 function colorFor(i,shift=0){
   // Fazları kaydırılmış RGB kanalları canlı ama pastel bir renk döngüsü üretir.
-  const phase=i*.48+shift;
+  const phase=paletteSeed+i*.48+shift;
   const r=.68+.22*Math.sin(phase);
   const g=.55+.19*Math.sin(phase+2.094);
   const b=.72+.20*Math.sin(phase+4.188);
@@ -41,18 +41,27 @@ function resizeBlockGeometry(block){
 }
 function createInitialBlock(){blocks.push(createBlock(CFG.size,CFG.size,0,0,0,0))}
 function spawnMovingBlock(){const prev=blocks.at(-1),y=blocks.length*CFG.height;axis=blocks.length%2?'x':'z';const direction=blocks.length%4<2?1:-1;const pos=direction*-CFG.bound;current=createBlock(prev.w,prev.d,axis==='x'?pos:prev.mesh.position.x,y,axis==='z'?pos:prev.mesh.position.z,blocks.length);current.direction=direction}
-function calculateOverlap(){const prev=blocks.at(-1),key=axis==='x'?'x':'z',sizeKey=axis==='x'?'w':'d',delta=current.mesh.position[key]-prev.mesh.position[key],size=prev[sizeKey];return{prev,key,sizeKey,delta,overlap:size-Math.abs(delta)}}
+function calculateOverlap(){
+  const prev=blocks.at(-1),key=axis==='x'?'x':'z',sizeKey=axis==='x'?'w':'d';
+  const previousSize=prev[sizeKey],currentSize=current[sizeKey];
+  const previousCenter=prev.mesh.position[key],currentCenter=current.mesh.position[key];
+  const previousMin=previousCenter-previousSize/2,previousMax=previousCenter+previousSize/2;
+  const currentMin=currentCenter-currentSize/2,currentMax=currentCenter+currentSize/2;
+  const overlapMin=Math.max(previousMin,currentMin),overlapMax=Math.min(previousMax,currentMax);
+  const overlap=Math.max(0,overlapMax-overlapMin);
+  return{prev,key,sizeKey,delta:currentCenter-previousCenter,size:previousSize,currentSize,overlap,overlapMin,overlapMax,overlapCenter:(overlapMin+overlapMax)/2};
+}
 function createFallingPiece(info){
-  const cut=Math.max(0,info.size-info.overlap);
+  const cut=Math.max(0,info.currentSize-info.overlap);
   if(cut<.001)return;
   const sign=Math.sign(info.delta)||1,p=current.mesh.position.clone();
   let pieceW=current.w,pieceD=current.d,pieceX=p.x,pieceZ=p.z;
   if(axis==='x'){
     pieceW=cut;
-    pieceX=info.prev.mesh.position.x+sign*(info.size/2+cut/2);
+    pieceX=sign>0?info.overlapMax+cut/2:info.overlapMin-cut/2;
   }else{
     pieceD=cut;
-    pieceZ=info.prev.mesh.position.z+sign*(info.size/2+cut/2);
+    pieceZ=sign>0?info.overlapMax+cut/2:info.overlapMin-cut/2;
   }
   const piece=createBlock(pieceW,pieceD,pieceX,p.y,pieceZ,current.index);
   piece.velocity=new THREE.Vector3(axis==='x'?sign*3.4:0,-.8,axis==='z'?sign*3.4:0);
@@ -60,11 +69,11 @@ function createFallingPiece(info){
   piece.mesh.material.transparent=true;piece.mesh.material.opacity=.92;
   piece.life=0;piece.maxLife=1.45;falling.push(piece);
 }
-function placeCurrentBlock(){if(state!=='playing'||!current)return;const info=calculateOverlap();if(info.overlap<=0){current.velocity=new THREE.Vector3(axis==='x'?current.direction*3.2:0,-.7,axis==='z'?current.direction*3.2:0);current.spin=new THREE.Vector3(.7,.4,.8);current.mesh.material.transparent=true;current.mesh.material.opacity=.92;current.life=0;current.maxLife=1.45;falling.push(current);current=null;endGame();return}const tolerance=Math.max(.045,info.size*.025),isPerfect=Math.abs(info.delta)<=tolerance;if(isPerfect){combo++;current.mesh.position[info.key]=info.prev.mesh.position[info.key];current[info.sizeKey]=Math.min(CFG.maxSize,info.size+Math.min(.035,combo*.004));resizeBlockGeometry(current);showPerfectEffect();playSound('perfect')}else{combo=0;createFallingPiece(info);current[info.sizeKey]=info.overlap;const center=info.prev.mesh.position[info.key]+info.delta/2;current.mesh.position[info.key]=center;resizeBlockGeometry(current);playSound('cut')}blocks.push(current);current=null;score++;speed=Math.min(6.2,2.6+score*.075);updateScoreUI();targetCameraY=Math.max(5.6,blocks.at(-1).mesh.position.y+3.9);spawnMovingBlock()}
+function placeCurrentBlock(){if(state!=='playing'||!current)return;const info=calculateOverlap();if(info.overlap<=0){current.velocity=new THREE.Vector3(axis==='x'?current.direction*3.2:0,-.7,axis==='z'?current.direction*3.2:0);current.spin=new THREE.Vector3(.7,.4,.8);current.mesh.material.transparent=true;current.mesh.material.opacity=.92;current.life=0;current.maxLife=1.45;falling.push(current);current=null;endGame();return}const tolerance=Math.max(.12,info.size*.06),isPerfect=Math.abs(info.delta)<=tolerance;if(isPerfect){combo++;current.mesh.position[info.key]=info.prev.mesh.position[info.key];current[info.sizeKey]=Math.min(CFG.maxSize,info.size+Math.min(.035,combo*.004));resizeBlockGeometry(current);showPerfectEffect();playSound('perfect')}else{combo=0;createFallingPiece(info);current[info.sizeKey]=info.overlap;current.mesh.position[info.key]=info.overlapCenter;resizeBlockGeometry(current);playSound('cut')}blocks.push(current);current=null;score++;speed=Math.min(6.2,2.6+score*.075);updateScoreUI();targetCameraY=Math.max(5.6,blocks.at(-1).mesh.position.y+3.9);spawnMovingBlock()}
 function showPerfectEffect(){ui.perfect.textContent=combo>1?`PERFECT ×${combo}`:'PERFECT';ui.perfect.classList.remove('show');void ui.perfect.offsetWidth;ui.perfect.classList.add('show');document.body.style.setProperty('--accent',combo>3?'#ffe19c':'#f477c2')}
 function updateScoreUI(){ui.score.textContent=score;ui.scoreWrap.classList.remove('bump');void ui.scoreWrap.offsetWidth;ui.scoreWrap.classList.add('bump')}
 function clearWorld(){[...blocks,...falling,current].filter(Boolean).forEach(disposeBlock);blocks=[];falling=[];current=null}
-function resetGame(){clearWorld();score=0;combo=0;speed=2.6;cameraY=targetCameraY=5.6;camera.position.set(7,cameraY,8);updateScoreUI();createInitialBlock()}
+function resetGame(){clearWorld();score=0;combo=0;speed=2.6;paletteSeed=Math.random()*Math.PI*2;cameraY=targetCameraY=5.6;camera.position.set(7,cameraY,8);updateScoreUI();createInitialBlock()}
 function startGame(){initAudio();resetGame();state='playing';ui.menu.classList.remove('active');ui.over.classList.remove('active');ui.scoreWrap.classList.remove('hidden');ui.hint.classList.remove('hidden');spawnMovingBlock()}
 function endGame(){state='gameOver';playSound('over');const high=Math.max(best(),score);safeSet('skylineBest',high);ui.finalScore.textContent=score;updateBestUI();ui.hint.classList.add('hidden');setTimeout(()=>ui.over.classList.add('active'),420);targetCameraY+=.35}
 function showMenu(){resetGame();state='menu';ui.over.classList.remove('active');ui.menu.classList.add('active');ui.scoreWrap.classList.add('hidden');ui.hint.classList.add('hidden');updateBestUI()}
