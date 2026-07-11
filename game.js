@@ -15,7 +15,14 @@ function tone(freq,duration=.09,type='sine',gain=.035,delay=0){if(!soundOn)retur
 function playSound(kind){if(kind==='place')tone(330,.07,'sine',.028);if(kind==='cut')tone(145,.12,'triangle',.025);if(kind==='perfect'){tone(520,.12,'sine',.035);tone(780,.14,'sine',.025,.055)}if(kind==='over'){tone(260,.25,'triangle',.035);tone(155,.3,'sine',.025,.15)}}
 
 function initScene(){scene=new THREE.Scene();scene.fog=new THREE.Fog(0xa99fe2,10,25);camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,.1,100);camera.position.set(7,5.6,8);renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;$('#scene').appendChild(renderer.domElement);scene.add(new THREE.HemisphereLight(0xddecff,0x65438e,2.1));scene.add(new THREE.AmbientLight(0xffffff,.65));const light=new THREE.DirectionalLight(0xffe5f5,2.3);light.position.set(-5,9,6);scene.add(light);clock=new THREE.Clock();resizeRenderer();animate()}
-function colorFor(i){const c=new THREE.Color();c.setHSL((.91-i*.012+1)%1,.55,.62);return c}
+function colorFor(i,shift=0){
+  // Fazları kaydırılmış RGB kanalları canlı ama pastel bir renk döngüsü üretir.
+  const phase=i*.48+shift;
+  const r=.68+.22*Math.sin(phase);
+  const g=.55+.19*Math.sin(phase+2.094);
+  const b=.72+.20*Math.sin(phase+4.188);
+  return new THREE.Color(r,g,b);
+}
 function createBlock(w,d,x,y,z,index){
   // Geçersiz bir kesim ölçüsünün tüm sahneyi bozmasını engelle.
   const width=Number.isFinite(w)?Math.max(w,.001):CFG.size;
@@ -24,7 +31,7 @@ function createBlock(w,d,x,y,z,index){
   const geo=new THREE.BoxGeometry(width,CFG.height,depth);
   const mat=new THREE.MeshStandardMaterial({color:colorFor(index),roughness:.56,metalness:.02});
   const mesh=new THREE.Mesh(geo,mat);mesh.position.set(px,py,pz);scene.add(mesh);
-  return{mesh,w:width,d:depth,index};
+  return{mesh,w:width,d:depth,index,targetColor:colorFor(index)};
 }
 function disposeBlock(b){scene.remove(b.mesh);b.mesh.geometry.dispose();b.mesh.material.dispose()}
 function resizeBlockGeometry(block){
@@ -62,8 +69,19 @@ function endGame(){state='gameOver';playSound('over');const high=Math.max(best()
 function showMenu(){resetGame();state='menu';ui.over.classList.remove('active');ui.menu.classList.add('active');ui.scoreWrap.classList.add('hidden');ui.hint.classList.add('hidden');updateBestUI()}
 function updateMovingBlock(dt){if(!current||state!=='playing')return;const key=axis==='x'?'x':'z';current.mesh.position[key]+=current.direction*speed*dt;if(current.mesh.position[key]>CFG.bound){current.mesh.position[key]=CFG.bound;current.direction=-1}else if(current.mesh.position[key]<-CFG.bound){current.mesh.position[key]=-CFG.bound;current.direction=1}}
 function updateFalling(dt){for(let i=falling.length-1;i>=0;i--){const p=falling[i];p.life+=dt;p.velocity.y-=CFG.gravity*dt;p.mesh.position.addScaledVector(p.velocity,dt);p.mesh.rotation.x+=p.spin.x*dt;p.mesh.rotation.y+=p.spin.y*dt;p.mesh.rotation.z+=p.spin.z*dt;if(p.life>3||p.mesh.position.y<cameraY-15){disposeBlock(p);falling.splice(i,1)}}}
+function updateBlockColors(dt){
+  const shift=score*.16;
+  for(const block of blocks){
+    block.targetColor=colorFor(block.index,shift);
+    block.mesh.material.color.lerp(block.targetColor,1-Math.exp(-2.4*dt));
+  }
+  if(current){
+    current.targetColor=colorFor(current.index,shift);
+    current.mesh.material.color.lerp(current.targetColor,1-Math.exp(-3.2*dt));
+  }
+}
 function updateCamera(dt){cameraY=THREE.MathUtils.damp(cameraY,targetCameraY,state==='gameOver'?1.8:3.2,dt);camera.position.y=cameraY;const lookY=cameraY-3.6;camera.lookAt(0,lookY,0)}
-function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);updateMovingBlock(dt);updateFalling(dt);updateCamera(dt);renderer.render(scene,camera)}
+function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);updateMovingBlock(dt);updateFalling(dt);updateBlockColors(dt);updateCamera(dt);renderer.render(scene,camera)}
 function resizeRenderer(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight,false);const portrait=innerHeight>innerWidth;camera.position.x=portrait?7.4:8.6;camera.position.z=portrait?8.8:9.4;camera.fov=portrait?39:34;camera.updateProjectionMatrix()}
 function gameInput(e){if(e.target.closest('button'))return;const now=performance.now();if(now-lastInput<180)return;lastInput=now;if(state==='playing')placeCurrentBlock()}
 
