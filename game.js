@@ -27,6 +27,11 @@ function createBlock(w,d,x,y,z,index){
   return{mesh,w:width,d:depth,index};
 }
 function disposeBlock(b){scene.remove(b.mesh);b.mesh.geometry.dispose();b.mesh.material.dispose()}
+function resizeBlockGeometry(block){
+  block.mesh.geometry.dispose();
+  block.mesh.geometry=new THREE.BoxGeometry(block.w,CFG.height,block.d);
+  block.mesh.scale.set(1,1,1);
+}
 function createInitialBlock(){blocks.push(createBlock(CFG.size,CFG.size,0,0,0,0))}
 function spawnMovingBlock(){const prev=blocks.at(-1),y=blocks.length*CFG.height;axis=blocks.length%2?'x':'z';const direction=blocks.length%4<2?1:-1;const pos=direction*-CFG.bound;current=createBlock(prev.w,prev.d,axis==='x'?pos:prev.mesh.position.x,y,axis==='z'?pos:prev.mesh.position.z,blocks.length);current.direction=direction}
 function calculateOverlap(){const prev=blocks.at(-1),key=axis==='x'?'x':'z',sizeKey=axis==='x'?'w':'d',delta=current.mesh.position[key]-prev.mesh.position[key],size=prev[sizeKey];return{prev,key,sizeKey,delta,overlap:size-Math.abs(delta)}}
@@ -47,7 +52,7 @@ function createFallingPiece(info){
   piece.spin=new THREE.Vector3(axis==='z'?sign*1.4:.25,.25,axis==='x'?-sign*1.4:.2);
   piece.life=0;falling.push(piece);
 }
-function placeCurrentBlock(){if(state!=='playing'||!current)return;const info=calculateOverlap();if(info.overlap<=0){current.velocity=new THREE.Vector3(axis==='x'?current.direction*1.2:0,0,axis==='z'?current.direction*1.2:0);current.spin=new THREE.Vector3(.7,.4,.8);current.life=0;falling.push(current);current=null;endGame();return}const tolerance=Math.max(.045,info.size*.025),isPerfect=Math.abs(info.delta)<=tolerance;if(isPerfect){combo++;current.mesh.position[info.key]=info.prev.mesh.position[info.key];current[info.sizeKey]=Math.min(CFG.maxSize,info.size+Math.min(.035,combo*.004));current.mesh.scale[axis==='x'?'x':'z']=current[info.sizeKey]/info.size;showPerfectEffect();playSound('perfect')}else{combo=0;createFallingPiece(info);current[info.sizeKey]=info.overlap;const center=info.prev.mesh.position[info.key]+info.delta/2;current.mesh.position[info.key]=center;current.mesh.scale[axis==='x'?'x':'z']=info.overlap/info.size;playSound('cut')}blocks.push(current);current=null;score++;speed=Math.min(6.2,2.6+score*.075);updateScoreUI();targetCameraY=Math.max(5.6,blocks.at(-1).mesh.position.y+3.9);spawnMovingBlock()}
+function placeCurrentBlock(){if(state!=='playing'||!current)return;const info=calculateOverlap();if(info.overlap<=0){current.velocity=new THREE.Vector3(axis==='x'?current.direction*1.2:0,0,axis==='z'?current.direction*1.2:0);current.spin=new THREE.Vector3(.7,.4,.8);current.life=0;falling.push(current);current=null;endGame();return}const tolerance=Math.max(.045,info.size*.025),isPerfect=Math.abs(info.delta)<=tolerance;if(isPerfect){combo++;current.mesh.position[info.key]=info.prev.mesh.position[info.key];current[info.sizeKey]=Math.min(CFG.maxSize,info.size+Math.min(.035,combo*.004));resizeBlockGeometry(current);showPerfectEffect();playSound('perfect')}else{combo=0;createFallingPiece(info);current[info.sizeKey]=info.overlap;const center=info.prev.mesh.position[info.key]+info.delta/2;current.mesh.position[info.key]=center;resizeBlockGeometry(current);playSound('cut')}blocks.push(current);current=null;score++;speed=Math.min(6.2,2.6+score*.075);updateScoreUI();targetCameraY=Math.max(5.6,blocks.at(-1).mesh.position.y+3.9);spawnMovingBlock()}
 function showPerfectEffect(){ui.perfect.textContent=combo>1?`PERFECT ×${combo}`:'PERFECT';ui.perfect.classList.remove('show');void ui.perfect.offsetWidth;ui.perfect.classList.add('show');document.body.style.setProperty('--accent',combo>3?'#ffe19c':'#f477c2')}
 function updateScoreUI(){ui.score.textContent=score;ui.scoreWrap.classList.remove('bump');void ui.scoreWrap.offsetWidth;ui.scoreWrap.classList.add('bump')}
 function clearWorld(){[...blocks,...falling,current].filter(Boolean).forEach(disposeBlock);blocks=[];falling=[];current=null}
