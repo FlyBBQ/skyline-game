@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.m
 
 const $=s=>document.querySelector(s);
 const ui={menu:$('#menu'),over:$('#gameOver'),score:$('#score'),scoreWrap:$('#scoreWrap'),menuBest:$('#menuBest'),finalScore:$('#finalScore'),finalBest:$('#finalBest'),perfect:$('#perfect'),hint:$('#hint'),sound:$('#sound')};
-const CFG={size:3.5,height:.72,bound:5.2,gravity:19,maxSize:3.5};
+const CFG={size:3.5,height:.72,bound:7,gravity:19,maxSize:3.5};
 let scene,camera,renderer,clock,state='menu',blocks=[],falling=[],current=null,axis='x',score=0,combo=0,speed=2.6,cameraY=5.6,targetCameraY=5.6,audio=null,soundOn=true,lastInput=0,paletteSeed=Math.random()*Math.PI*2,earth,stars,cloudLayers=[],planets=[],cosmicObjects=[],meteorTimer=0,alienTimer=0,creatureTimer=0;
 
 function safeGet(key,fallback){try{const v=localStorage.getItem(key);return v===null?fallback:v}catch{return fallback}}
