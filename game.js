@@ -41,11 +41,13 @@ function createWorldBackdrop(){
 }
 function createStarTexture(){const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;const c=canvas.getContext('2d'),cx=32,cy=32;c.fillStyle='#fff';c.shadowColor='#bde8ff';c.shadowBlur=8;c.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,r=i%2?8:27;c.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r)}c.closePath();c.fill();return new THREE.CanvasTexture(canvas)}
 function createCloudLayers(){
-  const white=new THREE.MeshStandardMaterial({color:0xf8fdff,transparent:true,opacity:.5,roughness:.92,depthWrite:false}),blue=new THREE.MeshStandardMaterial({color:0x9fd5ef,transparent:true,opacity:.28,roughness:1,depthWrite:false});
-  [6,16,28,41].forEach((y,layer)=>{const group=new THREE.Group();for(let cluster=0;cluster<3;cluster++){const cx=(cluster-1)*8+(Math.random()-.5)*3,cz=-11-Math.random()*7;for(let i=0;i<7;i++){const radius=.8+Math.random()*.85,puff=new THREE.Mesh(new THREE.SphereGeometry(radius,20,14),(i<2?blue:white).clone());puff.scale.set(1.25,.68,1);puff.position.set(cx+(i-3)*.58+(Math.random()-.5)*.5,(Math.random()-.25)*1.25,cz+(Math.random()-.5)*1.1);puff.renderOrder=-2;group.add(puff)}}group.position.y=y;group.userData.layer=layer;cloudLayers.push(group);scene.add(group)})
+  const white=new THREE.MeshStandardMaterial({color:0xf9fdff,transparent:true,opacity:.58,roughness:.9,depthWrite:false}),blue=new THREE.MeshStandardMaterial({color:0x8fc9e8,transparent:true,opacity:.34,roughness:1,depthWrite:false});
+  const layout=[[-2.3,0,.85],[-1.45,.12,1.05],[-.55,.08,1.2],[.45,.08,1.25],[1.45,.1,1.02],[2.25,0,.8],[-1.25,.75,1.05],[-.2,1.12,1.5],[1.05,.72,1.12]];
+  [7,18,31,44].forEach((y,layer)=>{const layerGroup=new THREE.Group();for(let cluster=0;cluster<3;cluster++){const cloud=new THREE.Group();for(const [x,py,r] of layout){const puff=new THREE.Mesh(new THREE.SphereGeometry(r,22,16),(py<.2?blue:white).clone());puff.scale.set(1.15,.78,1);puff.position.set(x,py,0);puff.renderOrder=-3;cloud.add(puff)}cloud.scale.setScalar(.8+Math.random()*.35);cloud.position.set((cluster-1)*10+(Math.random()-.5)*2,(Math.random()-.5)*1.4,-13-Math.random()*5);layerGroup.add(cloud)}layerGroup.position.y=y;layerGroup.userData.layer=layer;cloudLayers.push(layerGroup);scene.add(layerGroup)})
 }
 function makePlanet(name,radius,color,y,x,z){const mat=new THREE.MeshStandardMaterial({color,roughness:.75,emissive:name==='sun'?color:0x000000,emissiveIntensity:name==='sun'?.75:0});const mesh=new THREE.Mesh(new THREE.SphereGeometry(radius,32,20),mat);mesh.position.set(x,y,z);mesh.userData.name=name;planets.push(mesh);scene.add(mesh);return mesh}
-function createPlanets(){makePlanet('moon',1.25,0xc9ced8,38,-7,-7);makePlanet('mars',1.55,0xc95f43,61,8,-8);const saturn=makePlanet('saturn',2.05,0xd9b879,88,-8,-10);const ring=new THREE.Mesh(new THREE.RingGeometry(2.65,3.75,48),new THREE.MeshBasicMaterial({color:0xe7d2a4,side:THREE.DoubleSide,transparent:true,opacity:.72}));ring.rotation.x=Math.PI/2.5;saturn.add(ring);makePlanet('sun',3.2,0xffb43b,122,10,-14)}
+function addCraters(planet,radius,color){const normals=[new THREE.Vector3(.35,.35,.87),new THREE.Vector3(-.42,.2,.88),new THREE.Vector3(.12,-.38,.92),new THREE.Vector3(.62,-.18,.76)];normals.forEach((normal,i)=>{normal.normalize();const crater=new THREE.Mesh(new THREE.RingGeometry(.12+i*.035,.25+i*.055,20),new THREE.MeshBasicMaterial({color,side:THREE.DoubleSide,transparent:true,opacity:.72,depthWrite:false}));crater.position.copy(normal).multiplyScalar(radius*1.006);crater.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),normal);planet.add(crater)})}
+function createPlanets(){const moon=makePlanet('moon',1.25,0xc9ced8,38,-7,-7);addCraters(moon,1.25,0x7d8490);const mars=makePlanet('mars',1.55,0xc95f43,61,8,-8);addCraters(mars,1.55,0x763326);const saturn=makePlanet('saturn',2.05,0xd9b879,88,-8,-10);const ring=new THREE.Mesh(new THREE.RingGeometry(2.65,3.75,48),new THREE.MeshBasicMaterial({color:0xe7d2a4,side:THREE.DoubleSide,transparent:true,opacity:.72}));ring.rotation.x=Math.PI/2.5;saturn.add(ring);makePlanet('sun',3.2,0xffb43b,122,10,-14)}
 function colorFor(i,shift=0){
   // Tüm renk çemberini ve açık-koyu tonları kapsayan yumuşak RGB paleti.
   const phase=paletteSeed+i*.48+shift,hue=(phase/(Math.PI*2))%1;
@@ -87,7 +89,7 @@ function recoverRandomSide(block){
   block.mesh.position[dimension]+=side*amount/2;
 }
 function createInitialBlock(){blocks.push(createBlock(CFG.size,CFG.size,0,0,0,0))}
-function spawnMovingBlock(){const prev=blocks.at(-1),y=blocks.length*CFG.height;axis=blocks.length%2?'x':'z';const fromTop=axis==='x';const pos=fromTop?-CFG.bound:CFG.bound;const direction=fromTop?1:-1;current=createBlock(prev.w,prev.d,axis==='x'?pos:prev.mesh.position.x,y,axis==='z'?pos:prev.mesh.position.z,blocks.length);current.direction=direction}
+function spawnMovingBlock(){const prev=blocks.at(-1),y=blocks.length*CFG.height;axis=blocks.length%2?'x':'z';const pos=-CFG.bound,direction=1;current=createBlock(prev.w,prev.d,axis==='x'?pos:prev.mesh.position.x,y,axis==='z'?pos:prev.mesh.position.z,blocks.length);current.direction=direction}
 function calculateOverlap(){
   const prev=blocks.at(-1),key=axis==='x'?'x':'z',sizeKey=axis==='x'?'w':'d';
   const previousSize=prev[sizeKey],currentSize=current[sizeKey];
@@ -126,24 +128,14 @@ function endGame(){state='gameOver';playSound('over');const high=Math.max(best()
 function showMenu(){resetGame();state='menu';ui.over.classList.remove('active');ui.menu.classList.add('active');ui.scoreWrap.classList.add('hidden');ui.hint.classList.add('hidden');updateBestUI()}
 function updateMovingBlock(dt){if(!current||state!=='playing')return;const key=axis==='x'?'x':'z';current.mesh.position[key]+=current.direction*speed*dt;if(current.mesh.position[key]>CFG.bound){current.mesh.position[key]=CFG.bound;current.direction=-1}else if(current.mesh.position[key]<-CFG.bound){current.mesh.position[key]=-CFG.bound;current.direction=1}}
 function updateFalling(dt){for(let i=falling.length-1;i>=0;i--){const p=falling[i];p.life+=dt;p.velocity.y-=CFG.gravity*dt;p.mesh.position.addScaledVector(p.velocity,dt);p.mesh.rotation.x+=p.spin.x*dt;p.mesh.rotation.y+=p.spin.y*dt;p.mesh.rotation.z+=p.spin.z*dt;const maxLife=p.maxLife||1.45;p.mesh.material.opacity=Math.max(0,.92-p.life/maxLife*.92);if(p.life>maxLife||p.mesh.position.y<cameraY-10){disposeBlock(p);falling.splice(i,1)}}}
-function updateBlockColors(dt){
-  const shift=score*.16;
-  for(const block of blocks){
-    block.targetColor=colorFor(block.index,shift);
-    block.mesh.material.color.lerp(block.targetColor,1-Math.exp(-2.4*dt));
-  }
-  if(current){
-    current.targetColor=colorFor(current.index,shift);
-    current.mesh.material.color.lerp(current.targetColor,1-Math.exp(-3.2*dt));
-  }
-}
+function updateBlockColors(){/* Her blok oluşturulduğu anda aldığı kalıcı rengi korur. */}
 function updateEnvironment(dt){
   const progress=THREE.MathUtils.clamp(score/65,0,1),ease=progress*progress*(3-2*progress),starProgress=THREE.MathUtils.clamp((progress-.42)/.58,0,1);
   stars.material.opacity=THREE.MathUtils.damp(stars.material.opacity,starProgress*.95,2.2,dt);
   stars.rotation.y+=dt*.006;
   earth.material.emissiveIntensity=.2+ease*.18;
   const cloudOpacity=THREE.MathUtils.clamp(1-score/62,0,1);
-  for(const layer of cloudLayers){layer.rotation.y+=dt*(.012+layer.userData.layer*.002);for(const puff of layer.children)puff.material.opacity=THREE.MathUtils.damp(puff.material.opacity,cloudOpacity*.48,2,dt)}
+  for(const layer of cloudLayers){layer.rotation.y+=dt*(.012+layer.userData.layer*.002);layer.traverse(puff=>{if(puff.material)puff.material.opacity=THREE.MathUtils.damp(puff.material.opacity,cloudOpacity*(puff.material.color.b>.8?.58:.34),2,dt)})}
   for(const planet of planets)planet.rotation.y+=dt*(planet.userData.name==='sun'?.035:.08);
   const fogTarget=new THREE.Color().lerpColors(new THREE.Color(0xa5bde5),new THREE.Color(0x101531),ease);
   scene.fog.color.lerp(fogTarget,1-Math.exp(-1.8*dt));
