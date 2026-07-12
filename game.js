@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.m
 
 const $=s=>document.querySelector(s);
 const ui={menu:$('#menu'),over:$('#gameOver'),score:$('#score'),scoreWrap:$('#scoreWrap'),menuBest:$('#menuBest'),finalScore:$('#finalScore'),finalBest:$('#finalBest'),perfect:$('#perfect'),hint:$('#hint'),sound:$('#sound')};
-const CFG={size:3.5,height:.72,bound:4.35,gravity:19,maxSize:3.5};
+const CFG={size:3.5,height:.72,bound:5.2,gravity:19,maxSize:3.5};
 let scene,camera,renderer,clock,state='menu',blocks=[],falling=[],current=null,axis='x',score=0,combo=0,speed=2.6,cameraY=5.6,targetCameraY=5.6,audio=null,soundOn=true,lastInput=0,paletteSeed=Math.random()*Math.PI*2,earth,stars,cloudLayers=[],planets=[],cosmicObjects=[],meteorTimer=0,alienTimer=0,creatureTimer=0;
 
 function safeGet(key,fallback){try{const v=localStorage.getItem(key);return v===null?fallback:v}catch{return fallback}}
@@ -49,8 +49,9 @@ function createCloudTexture(){
 }
 function createCloudLayers(){
   const texture=createCloudTexture();
-  [7,18,31,44].forEach((y,layer)=>{const layerGroup=new THREE.Group();const positions=[[-11,-16],[0,-19],[11,-15]];positions.forEach(([x,z],i)=>{const material=new THREE.SpriteMaterial({map:texture,color:0xffffff,transparent:true,opacity:.58,depthWrite:false,depthTest:true});const cloud=new THREE.Sprite(material);const scale=5.6+(i%2)*.8;cloud.scale.set(scale*1.75,scale,1);cloud.position.set(x+(layer%2?2:-1),(i-1)*1.2,z-layer*.7);cloud.renderOrder=-4;layerGroup.add(cloud)});layerGroup.position.y=y;layerGroup.userData.layer=layer;cloudLayers.push(layerGroup);scene.add(layerGroup)})
+  [7,18,31,44].forEach((y,layer)=>{const layerGroup=new THREE.Group();for(let i=0;i<4;i++){const material=new THREE.SpriteMaterial({map:texture,color:0xffffff,transparent:true,opacity:.58,depthWrite:false,depthTest:true});const cloud=new THREE.Sprite(material);cloud.renderOrder=-4;layerGroup.add(cloud)}layerGroup.position.y=y;layerGroup.userData.layer=layer;cloudLayers.push(layerGroup);scene.add(layerGroup)});randomizeCloudPositions();
 }
+function randomizeCloudPositions(){for(const layer of cloudLayers){const slots=[-15,-6,5,15].sort(()=>Math.random()-.5);layer.children.forEach((cloud,i)=>{const scale=4.7+Math.random()*2.2;cloud.scale.set(scale*1.75,scale,1);cloud.position.set(slots[i]+(Math.random()-.5)*2.4,(Math.random()-.5)*6,-14-Math.random()*11-layer.userData.layer*.6)})}}
 function makePlanet(name,radius,color,y,x,z){const mat=new THREE.MeshStandardMaterial({color,roughness:.75,emissive:name==='sun'?color:0x000000,emissiveIntensity:name==='sun'?.75:0});const mesh=new THREE.Mesh(new THREE.SphereGeometry(radius,32,20),mat);mesh.position.set(x,y,z);mesh.userData.name=name;planets.push(mesh);scene.add(mesh);return mesh}
 function addCraters(planet,radius,color){const normals=[new THREE.Vector3(.35,.35,.87),new THREE.Vector3(-.42,.2,.88),new THREE.Vector3(.12,-.38,.92),new THREE.Vector3(.62,-.18,.76)];normals.forEach((normal,i)=>{normal.normalize();const crater=new THREE.Mesh(new THREE.RingGeometry(.12+i*.035,.25+i*.055,20),new THREE.MeshBasicMaterial({color,side:THREE.DoubleSide,transparent:true,opacity:.72,depthWrite:false}));crater.position.copy(normal).multiplyScalar(radius*1.006);crater.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),normal);planet.add(crater)})}
 function createPlanets(){const moon=makePlanet('moon',1.25,0xc9ced8,38,-7,-7);addCraters(moon,1.25,0x7d8490);const mars=makePlanet('mars',1.55,0xc95f43,61,8,-8);addCraters(mars,1.55,0x763326);const saturn=makePlanet('saturn',2.05,0xd9b879,88,-8,-10);const ring=new THREE.Mesh(new THREE.RingGeometry(2.65,3.75,48),new THREE.MeshBasicMaterial({color:0xe7d2a4,side:THREE.DoubleSide,transparent:true,opacity:.72}));ring.rotation.x=Math.PI/2.5;saturn.add(ring);makePlanet('sun',3.2,0xffb43b,122,10,-14)}
@@ -128,7 +129,7 @@ function placeCurrentBlock(){if(state!=='playing'||!current)return;const info=ca
 function showPerfectEffect(){ui.perfect.textContent=combo>1?`PERFECT ×${combo}`:'PERFECT';ui.perfect.classList.remove('show');void ui.perfect.offsetWidth;ui.perfect.classList.add('show');document.body.style.setProperty('--accent',combo>3?'#ffe19c':'#f477c2')}
 function updateScoreUI(){ui.score.textContent=score;ui.scoreWrap.classList.remove('bump');void ui.scoreWrap.offsetWidth;ui.scoreWrap.classList.add('bump')}
 function clearWorld(){[...blocks,...falling,current].filter(Boolean).forEach(disposeBlock);blocks=[];falling=[];current=null}
-function resetGame(){clearWorld();clearCosmicObjects();score=0;combo=0;speed=speedForScore(0);paletteSeed=Math.random()*Math.PI*2;cameraY=targetCameraY=5.6;camera.position.y=cameraY;resizeRenderer();updateScoreUI();createInitialBlock()}
+function resetGame(){clearWorld();clearCosmicObjects();randomizeCloudPositions();score=0;combo=0;speed=speedForScore(0);paletteSeed=Math.random()*Math.PI*2;cameraY=targetCameraY=5.6;camera.position.y=cameraY;resizeRenderer();updateScoreUI();createInitialBlock()}
 function startGame(){initAudio();resetGame();state='playing';ui.menu.classList.remove('active');ui.over.classList.remove('active');ui.scoreWrap.classList.remove('hidden');ui.hint.classList.remove('hidden');spawnMovingBlock()}
 function endGame(){state='gameOver';playSound('over');const high=Math.max(best(),score);safeSet('skylineBest',high);ui.finalScore.textContent=score;updateBestUI();ui.hint.classList.add('hidden');setTimeout(()=>ui.over.classList.add('active'),420);targetCameraY+=.35}
 function showMenu(){resetGame();state='menu';ui.over.classList.remove('active');ui.menu.classList.add('active');ui.scoreWrap.classList.add('hidden');ui.hint.classList.add('hidden');updateBestUI()}
