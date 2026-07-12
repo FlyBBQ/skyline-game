@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#aeb9ef">
   <title>SKYLINE — Tower Game</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,8 +14,9 @@
     <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
 
     <header class="hud" aria-live="polite">
+      <div id="bestWrap" class="best-hud hidden"><span>EN YÜKSEK</span><strong id="gameBest">0</strong></div>
       <div id="scoreWrap" class="score-wrap hidden"><span class="score-label">SKOR</span><strong id="score">0</strong></div>
-      <button id="sound" class="icon-button" type="button" aria-label="Sesi kapat" aria-pressed="false"><span class="speaker-icon"><i></i></span></button>
+      <button id="sound" class="icon-button" type="button" aria-label="Sesi kapat" aria-pressed="false"><i class="fa-solid fa-volume-high" aria-hidden="true"></i></button>
     </header>
 
     <section id="menu" class="screen active">
@@ -39,6 +41,6 @@
     </section>
     <p id="hint" class="hint hidden">YERLEŞTİRMEK İÇİN DOKUN</p>
   </main>
-  <script type="module" src="game.js?v=18"></script>
+  <script type="module" src="game.js?v=19"></script>
 </body>
 </html>
