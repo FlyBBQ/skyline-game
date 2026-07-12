@@ -15,11 +15,23 @@ function tone(freq,duration=.09,type='sine',gain=.035,delay=0){if(!soundOn)retur
 function playSound(kind){if(kind==='place')tone(330,.07,'sine',.028);if(kind==='cut')tone(145,.12,'triangle',.025);if(kind==='perfect'){const level=Math.min(combo,16),base=480+level*20;tone(base,.11,'sine',.032);tone(base*1.5,.14,'sine',.022,.045);if(combo>=7)tone(base*2,.16,'triangle',.014,.085)}if(kind==='over'){tone(260,.25,'triangle',.035);tone(155,.3,'sine',.025,.15)}}
 
 function initScene(){scene=new THREE.Scene();scene.fog=new THREE.Fog(0xa5bde5,10,28);camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,.1,120);camera.position.set(7,5.6,8);renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;$('#scene').appendChild(renderer.domElement);scene.add(new THREE.HemisphereLight(0xddecff,0x26305f,2.1));scene.add(new THREE.AmbientLight(0xffffff,.65));const light=new THREE.DirectionalLight(0xffe5f5,2.3);light.position.set(-5,9,6);scene.add(light);createWorldBackdrop();clock=new THREE.Clock();resizeRenderer();animate()}
+function createEarthTexture(){
+  const canvas=document.createElement('canvas');canvas.width=1024;canvas.height=512;const c=canvas.getContext('2d');
+  const ocean=c.createLinearGradient(0,0,0,512);ocean.addColorStop(0,'#1787c2');ocean.addColorStop(.55,'#086fae');ocean.addColorStop(1,'#07558f');c.fillStyle=ocean;c.fillRect(0,0,1024,512);
+  const drawLand=(points,color)=>{c.beginPath();points.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();c.fillStyle=color;c.fill();c.strokeStyle='rgba(43,91,52,.45)';c.lineWidth=3;c.stroke()};
+  drawLand([[70,105],[128,72],[180,88],[206,132],[188,174],[156,194],[144,236],[112,225],[91,184],[61,156]],'#63a65e');
+  drawLand([[158,226],[196,244],[215,292],[202,350],[176,411],[151,376],[142,319],[126,274]],'#6fac58');
+  drawLand([[430,118],[474,91],[536,99],[569,129],[614,116],[670,133],[718,165],[700,204],[646,211],[607,190],[566,208],[523,187],[487,197],[449,168]],'#6eaa5d');
+  drawLand([[493,201],[547,211],[570,251],[558,302],[527,354],[495,330],[478,283],[463,239]],'#b29a55');
+  drawLand([[711,166],[776,139],[842,154],[902,186],[944,222],[916,248],[865,236],[826,258],[779,231],[741,213]],'#739f55');
+  drawLand([[820,337],[874,323],[915,351],[892,382],[839,379],[807,360]],'#8ca85b');
+  drawLand([[367,137],[397,126],[411,144],[393,158],[366,153]],'#7daa61');
+  c.globalAlpha=.16;c.fillStyle='#fff';for(let i=0;i<35;i++){c.beginPath();c.ellipse(Math.random()*1024,50+Math.random()*380,25+Math.random()*70,3+Math.random()*8,Math.random(),0,Math.PI*2);c.fill()}c.globalAlpha=1;
+  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());return texture;
+}
 function createWorldBackdrop(){
-  const earthMat=new THREE.MeshStandardMaterial({color:0x3c88bd,roughness:.82,metalness:0,emissive:0x102b58,emissiveIntensity:.2});
+  const earthMat=new THREE.MeshStandardMaterial({map:createEarthTexture(),roughness:.82,metalness:0,emissive:0x082b4d,emissiveIntensity:.15});
   earth=new THREE.Mesh(new THREE.SphereGeometry(8,48,32),earthMat);earth.position.set(0,-8.15,0);scene.add(earth);
-  const landColors=[0x5fa66f,0x77ad68,0xb89966,0x4f9464];
-  [[-2.1,7.9,.6,1.65,.82,0],[.2,8.0,.9,1.05,.58,1],[2.25,7.84,-.45,1.5,.7,2],[3.55,7.63,1.05,.8,.42,3],[-3.6,7.62,-1.15,.9,.5,1],[-.8,7.82,-1.8,1.15,.5,2],[1.1,7.72,2.35,.75,.4,0]].forEach(([x,y,z,sx,sz,color])=>{const land=new THREE.Mesh(new THREE.SphereGeometry(1,24,14),new THREE.MeshStandardMaterial({color:landColors[color],roughness:.96,polygonOffset:true,polygonOffsetFactor:-2}));land.scale.set(sx,.2,sz);land.position.set(x,y,z);earth.add(land)});
   earth.add(new THREE.Mesh(new THREE.SphereGeometry(8.15,48,32),new THREE.MeshBasicMaterial({color:0x9be7ff,transparent:true,opacity:.11,side:THREE.BackSide,depthWrite:false})));
   createCloudLayers();createPlanets();
   const count=900,positions=new Float32Array(count*3);
@@ -35,12 +47,11 @@ function createCloudLayers(){
 function makePlanet(name,radius,color,y,x,z){const mat=new THREE.MeshStandardMaterial({color,roughness:.75,emissive:name==='sun'?color:0x000000,emissiveIntensity:name==='sun'?.75:0});const mesh=new THREE.Mesh(new THREE.SphereGeometry(radius,32,20),mat);mesh.position.set(x,y,z);mesh.userData.name=name;planets.push(mesh);scene.add(mesh);return mesh}
 function createPlanets(){makePlanet('moon',1.25,0xc9ced8,38,-7,-7);makePlanet('mars',1.55,0xc95f43,61,8,-8);const saturn=makePlanet('saturn',2.05,0xd9b879,88,-8,-10);const ring=new THREE.Mesh(new THREE.RingGeometry(2.65,3.75,48),new THREE.MeshBasicMaterial({color:0xe7d2a4,side:THREE.DoubleSide,transparent:true,opacity:.72}));ring.rotation.x=Math.PI/2.5;saturn.add(ring);makePlanet('sun',3.2,0xffb43b,122,10,-14)}
 function colorFor(i,shift=0){
-  // Fazları kaydırılmış RGB kanalları canlı ama pastel bir renk döngüsü üretir.
-  const phase=paletteSeed+i*.48+shift;
-  const r=.68+.22*Math.sin(phase);
-  const g=.55+.19*Math.sin(phase+2.094);
-  const b=.72+.20*Math.sin(phase+4.188);
-  return new THREE.Color(r,g,b);
+  // Tüm renk çemberini ve açık-koyu tonları kapsayan yumuşak RGB paleti.
+  const phase=paletteSeed+i*.48+shift,hue=(phase/(Math.PI*2))%1;
+  const saturation=.62+.2*(.5+.5*Math.sin(phase*.73+1.4));
+  const lightness=.28+.38*(.5+.5*Math.sin(phase*.41-.8));
+  return new THREE.Color().setHSL((hue+1)%1,saturation,lightness);
 }
 function createBlock(w,d,x,y,z,index){
   // Geçersiz bir kesim ölçüsünün tüm sahneyi bozmasını engelle.
@@ -147,7 +158,7 @@ function updateCosmicEvents(dt){if(score>=100){meteorTimer-=dt;alienTimer-=dt;cr
 function clearCosmicObjects(){for(const item of cosmicObjects){scene.remove(item.mesh);item.mesh.traverse?.(o=>{o.geometry?.dispose();o.material?.dispose()})}cosmicObjects=[];meteorTimer=0;alienTimer=0;creatureTimer=0}
 function updateCamera(dt){cameraY=THREE.MathUtils.damp(cameraY,targetCameraY,state==='gameOver'?1.8:3.2,dt);camera.position.y=cameraY;const lookY=cameraY-3.6;camera.lookAt(0,lookY,0)}
 function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);updateMovingBlock(dt);updateFalling(dt);updateBlockColors(dt);updateEnvironment(dt);updateCosmicEvents(dt);updateCamera(dt);renderer.render(scene,camera)}
-function resizeRenderer(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight,false);const portrait=innerHeight>innerWidth;camera.position.x=portrait?9.2:10.4;camera.position.z=portrait?11.2:12.4;camera.fov=portrait?49:45;camera.updateProjectionMatrix()}
+function resizeRenderer(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight,false);const portrait=innerHeight>innerWidth;camera.position.x=portrait?8.5:9.6;camera.position.z=portrait?10.2:11.3;camera.fov=portrait?46:42;camera.updateProjectionMatrix()}
 function gameInput(e){if(e.target.closest('button'))return;const now=performance.now();if(now-lastInput<180)return;lastInput=now;if(state==='playing')placeCurrentBlock()}
 
 $('#start').addEventListener('click',startGame);$('#replay').addEventListener('click',startGame);$('#home').addEventListener('click',showMenu);ui.sound.addEventListener('click',()=>{soundOn=!soundOn;safeSet('skylineSound',soundOn);ui.sound.setAttribute('aria-pressed',String(!soundOn));ui.sound.setAttribute('aria-label',soundOn?'Sesi kapat':'Sesi aç');if(soundOn){initAudio();tone(440)}});window.addEventListener('pointerdown',gameInput);window.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();gameInput(e)}});window.addEventListener('resize',resizeRenderer);document.addEventListener('contextmenu',e=>e.preventDefault());
