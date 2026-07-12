@@ -3,7 +3,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.m
 const $=s=>document.querySelector(s);
 const ui={menu:$('#menu'),over:$('#gameOver'),score:$('#score'),scoreWrap:$('#scoreWrap'),menuBest:$('#menuBest'),finalScore:$('#finalScore'),finalBest:$('#finalBest'),perfect:$('#perfect'),hint:$('#hint'),sound:$('#sound')};
 const CFG={size:3.5,height:.72,bound:4.35,gravity:19,maxSize:3.5};
-let scene,camera,renderer,clock,state='menu',blocks=[],falling=[],current=null,axis='x',score=0,combo=0,speed=2.6,cameraY=5.6,targetCameraY=5.6,audio=null,soundOn=true,lastInput=0,paletteSeed=Math.random()*Math.PI*2,earth,stars,cosmicObjects=[],meteorTimer=0,alienTimer=0;
+let scene,camera,renderer,clock,state='menu',blocks=[],falling=[],current=null,axis='x',score=0,combo=0,speed=2.6,cameraY=5.6,targetCameraY=5.6,audio=null,soundOn=true,lastInput=0,paletteSeed=Math.random()*Math.PI*2,earth,stars,cloudLayers=[],planets=[],cosmicObjects=[],meteorTimer=0,alienTimer=0,creatureTimer=0;
 
 function safeGet(key,fallback){try{const v=localStorage.getItem(key);return v===null?fallback:v}catch{return fallback}}
 function safeSet(key,v){try{localStorage.setItem(key,String(v))}catch{}}
@@ -19,13 +19,18 @@ function createWorldBackdrop(){
   const earthMat=new THREE.MeshStandardMaterial({color:0x3c88bd,roughness:.82,metalness:0,emissive:0x102b58,emissiveIntensity:.2});
   earth=new THREE.Mesh(new THREE.SphereGeometry(8,48,32),earthMat);earth.position.set(0,-8.15,0);scene.add(earth);
   const landMat=new THREE.MeshStandardMaterial({color:0x67a874,roughness:.95,polygonOffset:true,polygonOffsetFactor:-1});
-  [[-1.8,7.78,.8,1.5,.7],[2.1,7.68,-.6,1.1,.55],[.6,7.85,2.1,.8,.45],[-3.1,7.55,-1.5,.9,.5]].forEach(([x,y,z,sx,sz])=>{const land=new THREE.Mesh(new THREE.SphereGeometry(1,20,12),landMat);land.scale.set(sx,.12,sz);land.position.set(x,y-8.15,z);earth.add(land)});
+  [[-1.8,7.88,.8,1.5,.7],[2.1,7.8,-.6,1.1,.55],[.6,7.94,2.1,.8,.45],[-3.1,7.7,-1.5,.9,.5],[3.6,7.55,1.5,.7,.35]].forEach(([x,y,z,sx,sz])=>{const land=new THREE.Mesh(new THREE.SphereGeometry(1,20,12),landMat);land.scale.set(sx,.16,sz);land.position.set(x,y,z);earth.add(land)});
   earth.add(new THREE.Mesh(new THREE.SphereGeometry(8.15,48,32),new THREE.MeshBasicMaterial({color:0x9be7ff,transparent:true,opacity:.11,side:THREE.BackSide,depthWrite:false})));
-  const count=420,positions=new Float32Array(count*3);
+  createCloudLayers();createPlanets();
+  const count=900,positions=new Float32Array(count*3);
   for(let i=0;i<count;i++){const radius=18+Math.random()*35,theta=Math.random()*Math.PI*2,phi=Math.acos(2*Math.random()-1);positions[i*3]=radius*Math.sin(phi)*Math.cos(theta);positions[i*3+1]=radius*Math.cos(phi)+12;positions[i*3+2]=radius*Math.sin(phi)*Math.sin(theta)}
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
-  const material=new THREE.PointsMaterial({color:0xffffff,size:.09,transparent:true,opacity:0,depthWrite:false});stars=new THREE.Points(geometry,material);scene.add(stars);
+  const material=new THREE.PointsMaterial({color:0xffffff,size:.34,map:createStarTexture(),transparent:true,opacity:0,alphaTest:.08,depthWrite:false,sizeAttenuation:true});stars=new THREE.Points(geometry,material);scene.add(stars);
 }
+function createStarTexture(){const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;const c=canvas.getContext('2d'),cx=32,cy=32;c.fillStyle='#fff';c.shadowColor='#bde8ff';c.shadowBlur=8;c.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,r=i%2?8:27;c.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r)}c.closePath();c.fill();return new THREE.CanvasTexture(canvas)}
+function createCloudLayers(){const cloudMat=new THREE.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.42,roughness:1,depthWrite:false});[5,14,25,38].forEach((y,layer)=>{const group=new THREE.Group();for(let i=0;i<10;i++){const puff=new THREE.Mesh(new THREE.SphereGeometry(.7+Math.random()*.7,16,10),cloudMat.clone());puff.scale.y=.35;puff.position.set((Math.random()-.5)*18,(Math.random()-.5)*1.2,(Math.random()-.5)*15);group.add(puff)}group.position.y=y;group.userData.layer=layer;cloudLayers.push(group);scene.add(group)})}
+function makePlanet(name,radius,color,y,x,z){const mat=new THREE.MeshStandardMaterial({color,roughness:.75,emissive:name==='sun'?color:0x000000,emissiveIntensity:name==='sun'?.75:0});const mesh=new THREE.Mesh(new THREE.SphereGeometry(radius,32,20),mat);mesh.position.set(x,y,z);mesh.userData.name=name;planets.push(mesh);scene.add(mesh);return mesh}
+function createPlanets(){makePlanet('moon',1.25,0xc9ced8,38,-7,-7);makePlanet('mars',1.55,0xc95f43,61,8,-8);const saturn=makePlanet('saturn',2.05,0xd9b879,88,-8,-10);const ring=new THREE.Mesh(new THREE.RingGeometry(2.65,3.75,48),new THREE.MeshBasicMaterial({color:0xe7d2a4,side:THREE.DoubleSide,transparent:true,opacity:.72}));ring.rotation.x=Math.PI/2.5;saturn.add(ring);makePlanet('sun',3.2,0xffb43b,122,10,-14)}
 function colorFor(i,shift=0){
   // Fazları kaydırılmış RGB kanalları canlı ama pastel bir renk döngüsü üretir.
   const phase=paletteSeed+i*.48+shift;
@@ -52,8 +57,9 @@ function resizeBlockGeometry(block){
 }
 function speedForScore(value){
   if(value<=50)return 2.55+value*.014;
-  if(value<=100)return 3.25+(value-50)*.026;
-  return Math.min(7.5,4.55+(value-100)*.045);
+  if(value<=100)return 3.25+(value-50)*.018;
+  if(value<=200)return 4.15+(value-100)*.009;
+  return Math.min(6.1,5.05+(value-200)*.012);
 }
 function recoverRandomSide(block){
   const choices=[];
@@ -118,10 +124,13 @@ function updateBlockColors(dt){
   }
 }
 function updateEnvironment(dt){
-  const progress=THREE.MathUtils.clamp(score/32,0,1),ease=progress*progress*(3-2*progress);
-  stars.material.opacity=THREE.MathUtils.damp(stars.material.opacity,ease*.9,2.2,dt);
+  const progress=THREE.MathUtils.clamp(score/65,0,1),ease=progress*progress*(3-2*progress),starProgress=THREE.MathUtils.clamp((progress-.42)/.58,0,1);
+  stars.material.opacity=THREE.MathUtils.damp(stars.material.opacity,starProgress*.95,2.2,dt);
   stars.rotation.y+=dt*.006;
   earth.material.emissiveIntensity=.2+ease*.18;
+  const cloudOpacity=THREE.MathUtils.clamp(1-score/62,0,1);
+  for(const layer of cloudLayers){layer.rotation.y+=dt*(.012+layer.userData.layer*.002);for(const puff of layer.children)puff.material.opacity=THREE.MathUtils.damp(puff.material.opacity,cloudOpacity*.48,2,dt)}
+  for(const planet of planets)planet.rotation.y+=dt*(planet.userData.name==='sun'?.035:.08);
   const fogTarget=new THREE.Color().lerpColors(new THREE.Color(0xa5bde5),new THREE.Color(0x101531),ease);
   scene.fog.color.lerp(fogTarget,1-Math.exp(-1.8*dt));
   document.documentElement.style.setProperty('--bg1',`rgb(${Math.round(159*(1-ease)+10*ease)},${Math.round(217*(1-ease)+16*ease)},${Math.round(239*(1-ease)+43*ease)})`);
@@ -130,8 +139,9 @@ function updateEnvironment(dt){
 }
 function spawnMeteor(){const mesh=new THREE.Mesh(new THREE.BoxGeometry(.055,.055,2.2),new THREE.MeshBasicMaterial({color:Math.random()>.5?0xbbe8ff:0xffd1ef,transparent:true,opacity:.9}));mesh.position.set((Math.random()-.5)*18,cameraY+5+Math.random()*8,-8-Math.random()*8);mesh.rotation.set(.45,.2,-.65);scene.add(mesh);cosmicObjects.push({mesh,velocity:new THREE.Vector3(-5,-3,5),life:0,maxLife:1.5,type:'meteor'})}
 function spawnAlien(){const group=new THREE.Group(),body=new THREE.Mesh(new THREE.CylinderGeometry(.65,.9,.22,20),new THREE.MeshStandardMaterial({color:0x9ee9d4,emissive:0x245f69,emissiveIntensity:.5,roughness:.35})),dome=new THREE.Mesh(new THREE.SphereGeometry(.42,18,10,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:0xaeeaff,transparent:true,opacity:.72,roughness:.15}));dome.position.y=.1;group.add(body,dome);group.position.set(-11,cameraY+2.5,-3-Math.random()*5);scene.add(group);cosmicObjects.push({mesh:group,velocity:new THREE.Vector3(2.1,.08,0),life:0,maxLife:11,type:'alien'})}
-function updateCosmicEvents(dt){if(score>=100){meteorTimer-=dt;alienTimer-=dt;if(meteorTimer<=0){spawnMeteor();meteorTimer=.65+Math.random()*1.2}if(alienTimer<=0){spawnAlien();alienTimer=14+Math.random()*12}}for(let i=cosmicObjects.length-1;i>=0;i--){const item=cosmicObjects[i];item.life+=dt;item.mesh.position.addScaledVector(item.velocity,dt);if(item.type==='alien')item.mesh.rotation.y+=dt*.35;else item.mesh.material.opacity=Math.max(0,1-item.life/item.maxLife);if(item.life>=item.maxLife){scene.remove(item.mesh);item.mesh.traverse?.(o=>{o.geometry?.dispose();o.material?.dispose()});cosmicObjects.splice(i,1)}}}
-function clearCosmicObjects(){for(const item of cosmicObjects){scene.remove(item.mesh);item.mesh.traverse?.(o=>{o.geometry?.dispose();o.material?.dispose()})}cosmicObjects=[];meteorTimer=0;alienTimer=0}
+function spawnCreature(){const group=new THREE.Group(),skin=new THREE.MeshStandardMaterial({color:Math.random()>.5?0x8bea78:0xb985ee,emissive:0x173f38,emissiveIntensity:.35,roughness:.65}),head=new THREE.Mesh(new THREE.SphereGeometry(.62,20,14),skin),body=new THREE.Mesh(new THREE.CapsuleGeometry(.38,.75,6,12),skin),eyeMat=new THREE.MeshBasicMaterial({color:0x101525});head.scale.y=1.25;head.position.y=.9;body.position.y=-.05;const eye1=new THREE.Mesh(new THREE.SphereGeometry(.11,10,8),eyeMat),eye2=eye1.clone();eye1.position.set(-.22,1.02,.54);eye2.position.set(.22,1.02,.54);group.add(head,body,eye1,eye2);group.position.set(10,cameraY+1.5,-4-Math.random()*4);scene.add(group);cosmicObjects.push({mesh:group,velocity:new THREE.Vector3(-1.25,.04,0),life:0,maxLife:15,type:'creature'})}
+function updateCosmicEvents(dt){if(score>=100){meteorTimer-=dt;alienTimer-=dt;creatureTimer-=dt;if(meteorTimer<=0){spawnMeteor();meteorTimer=.65+Math.random()*1.2}if(alienTimer<=0){spawnAlien();alienTimer=14+Math.random()*12}if(creatureTimer<=0){spawnCreature();creatureTimer=10+Math.random()*16}}for(let i=cosmicObjects.length-1;i>=0;i--){const item=cosmicObjects[i];item.life+=dt;item.mesh.position.addScaledVector(item.velocity,dt);if(item.type==='alien')item.mesh.rotation.y+=dt*.35;else if(item.type==='creature'){item.mesh.rotation.y=Math.sin(item.life*1.8)*.22;item.mesh.position.y+=Math.sin(item.life*2.4)*dt*.15}else item.mesh.material.opacity=Math.max(0,1-item.life/item.maxLife);if(item.life>=item.maxLife){scene.remove(item.mesh);item.mesh.traverse?.(o=>{o.geometry?.dispose();o.material?.dispose()});cosmicObjects.splice(i,1)}}}
+function clearCosmicObjects(){for(const item of cosmicObjects){scene.remove(item.mesh);item.mesh.traverse?.(o=>{o.geometry?.dispose();o.material?.dispose()})}cosmicObjects=[];meteorTimer=0;alienTimer=0;creatureTimer=0}
 function updateCamera(dt){cameraY=THREE.MathUtils.damp(cameraY,targetCameraY,state==='gameOver'?1.8:3.2,dt);camera.position.y=cameraY;const lookY=cameraY-3.6;camera.lookAt(0,lookY,0)}
 function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);updateMovingBlock(dt);updateFalling(dt);updateBlockColors(dt);updateEnvironment(dt);updateCosmicEvents(dt);updateCamera(dt);renderer.render(scene,camera)}
 function resizeRenderer(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight,false);const portrait=innerHeight>innerWidth;camera.position.x=portrait?7.4:8.6;camera.position.z=portrait?8.8:9.4;camera.fov=portrait?39:34;camera.updateProjectionMatrix()}
