@@ -82,10 +82,12 @@ function resizeBlockGeometry(block){
   block.mesh.scale.set(1,1,1);
 }
 function speedForScore(value){
-  if(value<=50)return 2.55+value*.014;
-  if(value<=100)return 3.25+(value-50)*.018;
-  if(value<=200)return 4.15+(value-100)*.009;
-  return Math.min(6.1,5.05+(value-200)*.012);
+  // Her 50 seviyede hissedilir bir kademe; kademe içinde ise yumuşak hızlanma.
+  if(value<50)return 3.15+value*.008;
+  if(value<100)return 3.75+(value-50)*.010;
+  if(value<150)return 4.45+(value-100)*.011;
+  if(value<200)return 5.20+(value-150)*.012;
+  return Math.min(7,6+(value-200)*.006);
 }
 function recoverRandomSide(block){
   const choices=[];
